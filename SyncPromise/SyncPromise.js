@@ -35,7 +35,7 @@ export default class SyncPromise {
         const tasks = Array.from(iterable)
 
         if (tasks.length === 0) {
-            return new SyncPromise.resolve([])
+            return SyncPromise.resolve([])
         }
 
         return new SyncPromise((resolve, reject) => {
@@ -45,19 +45,21 @@ export default class SyncPromise {
             let done = 0;
     
             for (let i = 0; i < tasks.length; i++) {
+
+                const onFulfilled = (val) => {
+					done++;
+					results[i] = val;
+
+					if (done === tasks.length) {
+						resolve(results);
+					}
+				};
+
                 tasks[i] = SyncPromise.resolve(tasks[i]);
                 
-                tasks[i]
-                    .then((res) => {
-                        results[i] = res
-                        done++;
-    
-                        if (done === tasks.length) {
-                            resolve(results)
-                        }
-                    })
-                    .catch((err) => reject(err))
+                tasks[i].then(onFulfilled, reject)
             }
+
         })
     }
 
@@ -65,7 +67,7 @@ export default class SyncPromise {
         const tasks = Array.from(iterable)
 
         if (tasks.length === 0) {
-            return new SyncPromise.resolve([])
+            return SyncPromise.resolve([])
         }
 
         return new SyncPromise((resolve) => {
@@ -78,22 +80,24 @@ export default class SyncPromise {
                 tasks[i] = SyncPromise.resolve(tasks[i]);
                 
                 tasks[i]
-                    .then((value) => {
-                        results[i] = { status: Status.fulfilled, value }
-                        done++;
-    
-                        if (done === tasks.length) {
-                            resolve(results)
+                    .then (
+                        (value) => {
+                            results[i] = { status: Status.fulfilled, value }
+                            done++;
+        
+                            if (done === tasks.length) {
+                                resolve(results)
+                            }
+                        },
+                        (reason) => {
+                            results[i] = { status: Status.rejected, reason }
+                            done++;
+        
+                            if (done === tasks.length) {
+                                resolve(results)
+                            }
                         }
-                    })
-                    .catch((reason) => {
-                        results[i] = { status: Status.rejected, reason }
-                        done++;
-    
-                        if (done === tasks.length) {
-                            resolve(results)
-                        }
-                    })
+                    )
             }
         })
 
@@ -103,12 +107,14 @@ export default class SyncPromise {
         const tasks = Array.from(iterable)
 
         if (tasks.length === 0) {
-            return new SyncPromise.resolve()
+            return SyncPromise.resolve()
         }
 
         return new SyncPromise((resolve, reject) => {
-
+            
             for (let i = 0; i < tasks.length; i++) {
+                tasks[i] = SyncPromise.resolve(tasks[i])
+
                 tasks[i].then(resolve, reject)
             }
 
@@ -119,14 +125,14 @@ export default class SyncPromise {
         let tasks = Array.from(iterable)
 
         if (tasks.length === 0) {
-            return new SyncPromise.resolve([])
+            return SyncPromise.resolve([])
         }
 
         return new SyncPromise((resolve, reject) => {
             const errors = []
 
             for (let i = 0; i < tasks.length; i++) {
-                tasks[i] = new SyncPromise.resolve(tasks[i]);
+                tasks[i] = SyncPromise.resolve(tasks[i]);
 
                 tasks[i].then(resolve, onRejected)
             }
@@ -158,7 +164,7 @@ export default class SyncPromise {
                 value.then(resolve, reject)
             }
 
-            this.status = Status.fulfilled
+            this.#status = Status.fulfilled
             this.#value = value
 
             for (const fn of this.#onFulfilled) {
@@ -171,7 +177,7 @@ export default class SyncPromise {
                 return;
             }
 
-            this.status = Status.rejected
+            this.#status = Status.rejected
             this.#reason = reason
 
             for (const fn of this.#onRejected) {

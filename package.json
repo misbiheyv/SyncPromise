@@ -5,8 +5,12 @@
   "main": "main.js",
   "type": "module",
   "scripts": {
-    "dev": "node main.js"
+    "test": "jest"
   },
   "author": "misbiheyv",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/plugin-transform-modules-commonjs": "^7.18.2",
+    "jest": "^28.1.1"
+  }
 }
