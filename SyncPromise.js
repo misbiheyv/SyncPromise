@@ -19,7 +19,7 @@ class SyncPromise {
 
         const resolve = (value) => {
 
-            if (this.status !== STATUS.pending) {
+            if (this.status !== STATUS.pending || this.value != null) {
                 return;
             }
 
@@ -124,8 +124,51 @@ class SyncPromise {
     }
 
     finally(cb) {
+        return new SyncPromise((resolve, reject) => {
+            const fulfilled = () => {
+                try {
+                    let res = cb()
+    
+                    if (res && typeof res.then === 'function') {
+                        res = res.then(() => this.value)
+                    }
+    
+                    resolve(res)
+                } catch (error) {
+                    reject(error)
+                }
+            }
+    
+            const rejected = () => {
+                try {
+                    let res = cb()
+    
+                    if (res && typeof res.then === 'function') {
+                        res = res.then(() => {
+                            throw this.reason
+                        })
+                    }
+    
+                    resolve(res)
+                } catch (error) {
+                    reject(error)
+                }
+            }
 
-        return ;
+            if (this.status === STATUS.fulfilled) {
+                fulfilled()
+                return ;
+            }
+
+            if (this.status === STATUS.rejected) {
+                rejected()
+                return ;
+            }
+
+            this.onFulfilled.push(fulfilled)
+
+            this.onRejected.push(rejected)
+        })
     }
 }
 
@@ -135,7 +178,26 @@ const sp = new SyncPromise((res, rej) => {
 })
 
 sp.then((res) => {
-    throw new Error('lol')
-}).catch((err) => {
-    console.log(err)
+    console.log(res)
+    return res
+}).then((res) => {
+    console.log(res)
+    return res
+}).finally((res) => {
+    console.log(res)
 })
+
+
+// const p = new Promise((res, rej) => {
+//     setTimeout(() => {res(2000)},2000)
+// })
+
+// p.then((res) => {
+//     console.log(res)
+//     return res
+// }).then((res) => {
+//     console.log(res)
+//     return res
+// }).finally((res) => {
+//     console.log(res)
+// })
