@@ -1,0 +1,12 @@
+{
+  "name": "syncpromise",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node main.js"
+  },
+  "author": "misbiheyv",
+  "license": "ISC"
+}

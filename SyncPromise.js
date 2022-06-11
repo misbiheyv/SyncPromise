@@ -1,25 +1,156 @@
-const STATUS = {
-    fulfilled: 'fulfilled',
-    rejected: 'rejected',
-    pending: 'pending',
-}
+import { Status } from "./Status.js"
 
-class SyncPromise {
-    status = 'pending'
+export default class SyncPromise {
 
-    onFulfilled = []
+//#region properties
 
-    onRejected = []
+    #status = Status.pending
 
-    value = undefined
+    #onFulfilled = []
 
-    reason = undefined
+    #onRejected = []
+
+    #value = undefined
+
+    #reason = undefined
+
+//#endregion
+
+
+//#region static methods
+
+    static resolve(value) {
+        if (value instanceof SyncPromise) { 
+            return value
+        }
+
+        return new SyncPromise((resolve) => { resolve(value) })
+    }
+
+    static reject(reason) {
+        return new SyncPromise((_, reject) => { reject(reason) })
+    }
+
+    static all(iterable) {
+        const tasks = Array.from(iterable)
+
+        if (tasks.length === 0) {
+            return new SyncPromise.resolve([])
+        }
+
+        return new SyncPromise((resolve, reject) => {
+
+            const results = new Array(tasks.length);
+    
+            let done = 0;
+    
+            for (let i = 0; i < tasks.length; i++) {
+                tasks[i] = SyncPromise.resolve(tasks[i]);
+                
+                tasks[i]
+                    .then((res) => {
+                        results[i] = res
+                        done++;
+    
+                        if (done === tasks.length) {
+                            resolve(results)
+                        }
+                    })
+                    .catch((err) => reject(err))
+            }
+        })
+    }
+
+    static allSettled(iterable) {
+        const tasks = Array.from(iterable)
+
+        if (tasks.length === 0) {
+            return new SyncPromise.resolve([])
+        }
+
+        return new SyncPromise((resolve) => {
+
+            const results = new Array(tasks.length);
+    
+            let done = 0; 
+    
+            for (let i = 0; i < tasks.length; i++) {
+                tasks[i] = SyncPromise.resolve(tasks[i]);
+                
+                tasks[i]
+                    .then((value) => {
+                        results[i] = { status: Status.fulfilled, value }
+                        done++;
+    
+                        if (done === tasks.length) {
+                            resolve(results)
+                        }
+                    })
+                    .catch((reason) => {
+                        results[i] = { status: Status.rejected, reason }
+                        done++;
+    
+                        if (done === tasks.length) {
+                            resolve(results)
+                        }
+                    })
+            }
+        })
+
+    }
+
+    static race(iterable) {
+        const tasks = Array.from(iterable)
+
+        if (tasks.length === 0) {
+            return new SyncPromise.resolve()
+        }
+
+        return new SyncPromise((resolve, reject) => {
+
+            for (let i = 0; i < tasks.length; i++) {
+                tasks[i].then(resolve, reject)
+            }
+
+        })
+    }
+
+    static any(iterable) {
+        let tasks = Array.from(iterable)
+
+        if (tasks.length === 0) {
+            return new SyncPromise.resolve([])
+        }
+
+        return new SyncPromise((resolve, reject) => {
+            const errors = []
+
+            for (let i = 0; i < tasks.length; i++) {
+                tasks[i] = new SyncPromise.resolve(tasks[i]);
+
+                tasks[i].then(resolve, onRejected)
+            }
+
+            function onRejected(err) {
+                errors.push(err)
+
+                if (errors.length === tasks.length) {
+                    reject(new Error(errors, 'No one Promise was resolved'))
+                }
+            }
+        })
+    }
+
+//#endregion
+
+
+//#region static constructor
 
     constructor(executor) {
 
         const resolve = (value) => {
 
-            if (this.status !== STATUS.pending || this.value != null) {
+            if (this.#status !== Status.pending || this.#value != null) {
                 return;
             }
 
@@ -27,29 +158,29 @@ class SyncPromise {
                 value.then(resolve, reject)
             }
 
-            this.status = STATUS.fulfilled
-            this.value = value
+            this.status = Status.fulfilled
+            this.#value = value
 
-            for (const fn of this.onFulfilled) {
-                fn(this.value)
+            for (const fn of this.#onFulfilled) {
+                fn(this.#value)
             }
         }
 
         const reject = (reason) => {
-            if (this.status !== STATUS.pending) {
+            if (this.#status !== Status.pending) {
                 return;
             }
 
-            this.status = STATUS.rejected
-            this.reason = reason
+            this.status = Status.rejected
+            this.#reason = reason
 
-            for (const fn of this.onRejected) {
-                fn(this.reason)
+            for (const fn of this.#onRejected) {
+                fn(this.#reason)
             }
 
             queueMicrotask(() => {
-                if (this.onRejected.length === 0) {
-                    Promise.reject(this.reason)
+                if (this.#onRejected.length === 0) {
+                    Promise.reject(this.#reason)
                 }
             })
         }
@@ -62,12 +193,17 @@ class SyncPromise {
 
     }
 
+//#endregion
+
+
+//#region methods
+
     then(onFulfilled, onRejected) {
         return new SyncPromise((resolve, reject) => {
 
             const fulfilled = () => {
                 try {
-                    resolve( onFulfilled ? onFulfilled(this.value) : this.value )
+                    resolve( onFulfilled ? onFulfilled(this.#value) : this.#value )
                 } catch (error) {
                     reject(error)
                 }
@@ -75,25 +211,25 @@ class SyncPromise {
 
             const rejected = () => {
                 try {
-                    resolve(onRejected ? onRejected(this.reason) : this.reason)
+                    resolve(onRejected ? onRejected(this.#reason) : this.#reason)
                 } catch (error) {
                     reject(error)
                 }
             }
 
-            if (this.status === STATUS.fulfilled) {
+            if (this.#status === Status.fulfilled) {
                 fulfilled()
                 return ;
             }
 
-            if (this.status === STATUS.rejected) {
+            if (this.#status === Status.rejected) {
                 rejected()
                 return ;
             }
 
-            this.onFulfilled.push(fulfilled)
+            this.#onFulfilled.push(fulfilled)
 
-            this.onRejected.push(rejected)
+            this.#onRejected.push(rejected)
         })
     }
 
@@ -101,25 +237,25 @@ class SyncPromise {
         return new SyncPromise( (resolve, reject) => {
             const rejected = () => {
                 try {
-                    resolve(onRejected ? onRejected(this.reason) : this.reason)
+                    resolve(onRejected ? onRejected(this.#reason) : this.#reason)
                 } catch (error) {
                     reject(error)
                 }
             }
 
-            if (this.status === STATUS.fulfilled) {
-                resolve(this.value)
+            if (this.#status === Status.fulfilled) {
+                resolve(this.#value)
                 return ;
             }
 
-            if (this.status === STATUS.rejected) { 
+            if (this.#status === Status.rejected) { 
                 rejected()
                 return ;
             }
 
-            this.onFulfilled.push(resolve)
+            this.#onFulfilled.push(resolve)
 
-            this.onRejected.push(rejected)
+            this.#onRejected.push(rejected)
         })
     }
 
@@ -130,9 +266,9 @@ class SyncPromise {
                     let res = cb()
     
                     if (res && typeof res.then === 'function') {
-                        res = res.then(() => this.value)
+                        res = res.then(() => this.#value)
                     } else {
-                        res = this.value
+                        res = this.#value
                     }
     
                     resolve(res)
@@ -147,12 +283,12 @@ class SyncPromise {
     
                     if (res && typeof res.then === 'function') {
                         res = res.then(() => {
-                            throw this.reason
+                            throw this.#reason
                         })
 
                         resolve(res)
                     } else {
-                        reject(this.reason)
+                        reject(this.#reason)
                     }
     
                 } catch (error) {
@@ -160,49 +296,22 @@ class SyncPromise {
                 }
             }
 
-            if (this.status === STATUS.fulfilled) {
+            if (this.#status === Status.fulfilled) {
                 fulfilled()
                 return ;
             }
 
-            if (this.status === STATUS.rejected) {
+            if (this.#status === Status.rejected) {
                 rejected()
                 return ;
             }
 
-            this.onFulfilled.push(fulfilled)
+            this.#onFulfilled.push(fulfilled)
 
-            this.onRejected.push(rejected)
+            this.#onRejected.push(rejected)
         })
     }
+
+//#endregion
+
 }
-
-
-const sp = new SyncPromise((res, rej) => {
-    setTimeout(() => {res(2000)},2000)
-})
-
-sp.then((res) => {
-    console.log(res)
-    return res
-}).then((res) => {
-    console.log(res)
-    return res
-}).finally((res) => {
-    console.log(res)
-})
-
-
-// const p = new Promise((res, rej) => {
-//     setTimeout(() => {res(2000)},2000)
-// })
-
-// p.then((res) => {
-//     console.log(res)
-//     return res
-// }).then((res) => {
-//     console.log(res)
-//     return res
-// }).finally((res) => {
-//     console.log(res)
-// })
