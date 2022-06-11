@@ -131,6 +131,8 @@ class SyncPromise {
     
                     if (res && typeof res.then === 'function') {
                         res = res.then(() => this.value)
+                    } else {
+                        res = this.value
                     }
     
                     resolve(res)
@@ -147,9 +149,12 @@ class SyncPromise {
                         res = res.then(() => {
                             throw this.reason
                         })
+
+                        resolve(res)
+                    } else {
+                        reject(this.reason)
                     }
     
-                    resolve(res)
                 } catch (error) {
                     reject(error)
                 }
